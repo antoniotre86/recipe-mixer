@@ -1,0 +1,12 @@
+.search-ingredient-box {
+    width:90%;
+    margin-top: 20px;
+    padding: 2rem 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: left;
+    border-style: solid;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: slategrey;
+}
