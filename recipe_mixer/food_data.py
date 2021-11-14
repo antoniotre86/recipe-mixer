@@ -4,7 +4,9 @@ Created on 12/11/2021
 @author: trentaa
 '''
 import requests
-import json
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 
 class FoodData:
@@ -22,6 +24,9 @@ class FoodData:
     def __init__(self, app_id, api_key):
         self._app_id = app_id
         self._api_key = api_key
+        self._api_calls = 0
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.info("FoodData API ready")
 
     def _request_post(self, url, json):
         request_id = url + str(json)
@@ -30,6 +35,8 @@ class FoodData:
         else:
             resp = requests.post(url, json=json)
             self.store[request_id] = resp
+            self._api_calls += 1
+            self.logger.info(f"API calls in this session: {self._api_calls}")
             return resp
 
     def _request_get(self, url):
@@ -39,7 +46,9 @@ class FoodData:
         else:
             resp = requests.get(url)
             self.store[request_id] = resp
-            return resp
+            self._api_calls += 1
+            self.logger.info(f"API calls in this session: {self._api_calls}")
+        return resp
 
     def get_nutrients_for_food(self, food_id, quantity, measure):
         request_url = f"https://api.edamam.com/api/food-database/v2/nutrients?app_id={self._app_id}&app_key={self._api_key}"

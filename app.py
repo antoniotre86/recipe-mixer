@@ -4,19 +4,23 @@ Created on 12/11/2021
 @author: trentaa
 '''
 import json
+import logging
 import os
 
 import dash
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc, html
 import pandas as pd
 from dash.dependencies import Input, Output, State
-
-from recipe_mixer.food_data import FoodData
 from dotenv import load_dotenv
 
+from recipe_mixer.food_data import FoodData
 
 app = dash.Dash(__name__)
+
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger("Dash app")
 
 
 # Initialise food data API client
@@ -162,9 +166,7 @@ def ingredient_nutrition_table(ingredient_nutrition_json, ingredient_quantity):
     prevent_initial_call=True
 )
 def add_ingredient_to_list(_, ingredient_list_data_json, ingredient_id):
-    print("a", ingredient_id)
     ingredient_list_data = set(json.loads(ingredient_list_data_json or "[]"))
-    print("a1", ingredient_list_data)
     ingredient_list_data.add(ingredient_id)
     return json.dumps(list(ingredient_list_data))
 
@@ -176,11 +178,8 @@ def add_ingredient_to_list(_, ingredient_list_data_json, ingredient_id):
     prevent_initial_call=True
 )
 def render_ingredient_list(ingredient_list_data_json, food_names_store_data_json):
-    print("b", ingredient_list_data_json)
-    print("b1", food_names_store_data_json)
     ingredient_ids_data = json.loads(ingredient_list_data_json or "[]")
     food_names_store_data_d = {i_id: i_name for i_id, i_name, _ in json.loads(food_names_store_data_json or "[]")}
-    # ingredient_list_data = [f"{i_id}, {food_names_store_data_d[i_id]}" for i_id in ingredient_ids_data]
     ingredient_list_data = [div_ingredient_list_entry(i_id, food_names_store_data_d[i_id]) for i_id in ingredient_ids_data]
     return ingredient_list_data
 
