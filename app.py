@@ -61,15 +61,15 @@ def div_search_ingredient_box():
                 style={"display": "flex", "width": "100%"}
             ),
             dcc.Dropdown(id="ingredient-input", searchable=False, style={"width": "100%"}),
-            html.Div(
-                children=[
-                    dcc.Dropdown(id="ingredient-measure", options=measure_options, value="gram", searchable=False,
-                                 clearable=False, style={"width": "100px"}),
-                    dcc.Input(id="ingredient-quantity", value=1, min=0, type="number",
-                              placeholder="Ingredient quantity in grams", style={"width": "100px"}),
-                ],
-                style={"display": "flex", "width": "200px"}
-            ),
+            # html.Div(
+            #     children=[
+            #         dcc.Dropdown(id="ingredient-measure", options=measure_options, value="gram", searchable=False,
+            #                      clearable=False, style={"width": "100px"}),
+            #         dcc.Input(id="ingredient-quantity", value=1, min=0, type="number",
+            #                   placeholder="Ingredient quantity in grams", style={"width": "100px"}),
+            #     ],
+            #     style={"display": "flex", "width": "200px"}
+            # ),
             html.Button(id="add-ingredient-button", n_clicks=0, children="Add ingredient")
         ]
     )
@@ -80,8 +80,13 @@ def div_ingredient_list_entry(food_id, food_name):
         id=f"ingredient-list-entry-{food_id}",
         className="ingredient-list",
         children=[
-            html.H3(food_name)
-        ]
+            html.P(food_name),
+            dcc.Dropdown(id="ingredient-measure", options=measure_options, value="gram", searchable=False,
+                         clearable=False, style={"width": "100px"}),
+            dcc.Input(id="ingredient-quantity", value=1, min=0, type="number",
+                      placeholder="Ingredient quantity in grams", style={"width": "100px"})
+        ],
+        style={"display": "flex", "width": "200px"}
     )
 
 
@@ -118,17 +123,17 @@ def update_ingredient_name_dropdown(ingredient_search_results):
 
 @app.callback(
     Output("food-data-store", "data"),
-    Input(component_id="add-ingredient-button", component_property="n_clicks"),
+    Input("add-ingredient-button", "n_clicks"),
     State("ingredient-input", "value"),
-    State("ingredient-measure", "value"),
+    State("food-data-store", "data"),
     prevent_initial_call=True
 )
-def get_ingredient_data(_, ingredient_id, ingredient_measure):
+def get_ingredient_data(_, ingredient_id, ingredient_nutrition_data_json):
+    ingredient_nutrition_data = json.loads(ingredient_nutrition_data_json or "[]")
     if ingredient_id != "":
-        food_data = fd.get_nutrients_for_food(ingredient_id, 1, ingredient_measure)
-    else:
-        food_data = {}
-    return json.dumps(food_data)
+        food_data = fd.get_nutrients_for_food(ingredient_id, 1, "gram")
+        ingredient_nutrition_data += [(ingredient_id, food_data)]
+    return json.dumps(ingredient_nutrition_data)
 
 
 @app.callback(
@@ -137,50 +142,36 @@ def get_ingredient_data(_, ingredient_id, ingredient_measure):
     Input("ingredient-quantity", "value"),
     prevent_initial_call=True
 )
-def ingredient_nutrition_table(ingredient_nutrition_json, ingredient_quantity):
-    ingredient_nutrition = json.loads(ingredient_nutrition_json)
+def render_ingredient_nutrition_table(ingredient_nutrition_data_json, ingredient_quantity):
+    ingredient_nutrition_data = json.loads(ingredient_nutrition_data_json or "[]")
     q = ingredient_quantity or 0
-    if ingredient_nutrition == {}:
-        return generate_table(pd.DataFrame({"": ["Search for an ingredient"]}))
-    elif len(ingredient_nutrition['ingredients'][0]) == 0:
-        return generate_table(pd.DataFrame({"": ["Ingredient not found"]}))
-    else:
-        ingredient_nutrition_df = pd.DataFrame(
-            {
-                "Ingredient": ingredient_nutrition["ingredients"][0]["parsed"][0]["food"],
-                "KCal": ingredient_nutrition["calories"]*q,
-                "Carb": (ingredient_nutrition["totalNutrients"]["CHOCDF"]["quantity"]*q if "CHOCDF" in ingredient_nutrition["totalNutrients"] else 0),
-                "Fat": (ingredient_nutrition["totalNutrients"]["FAT"]["quantity"]*q if "FAT" in ingredient_nutrition["totalNutrients"] else 0),
-                "Protein": (ingredient_nutrition["totalNutrients"]["PROCNT"]["quantity"]*q if "PROCNT" in ingredient_nutrition["totalNutrients"] else 0)
-            },
-            index=[0]
-        ).round(2)
-        return generate_table(ingredient_nutrition_df)
-
-
-@app.callback(
-    Output("ingredient-list-store", "data"),
-    Input("add-ingredient-button", "n_clicks"),
-    State("ingredient-list-store", "data"),
-    State("ingredient-input", "value"),
-    prevent_initial_call=True
-)
-def add_ingredient_to_list(_, ingredient_list_data_json, ingredient_id):
-    ingredient_list_data = set(json.loads(ingredient_list_data_json or "[]"))
-    ingredient_list_data.add(ingredient_id)
-    return json.dumps(list(ingredient_list_data))
+    ingredient_nutrition_df = pd.DataFrame()
+    for i_id, i_data in ingredient_nutrition_data:
+        ingredient_nutrition_df = ingredient_nutrition_df.append(
+            pd.Series({
+                "Ingredient": i_data["ingredients"][0]["parsed"][0]["food"],
+                "KCal": i_data["calories"]*q,
+                "Carb": (i_data["totalNutrients"]["CHOCDF"]["quantity"]*q if "CHOCDF" in i_data["totalNutrients"] else 0),
+                "Fat": (i_data["totalNutrients"]["FAT"]["quantity"]*q if "FAT" in i_data["totalNutrients"] else 0),
+                "Protein": (i_data["totalNutrients"]["PROCNT"]["quantity"]*q if "PROCNT" in i_data["totalNutrients"] else 0)
+            }),
+            ignore_index=True
+        )
+    total_df = ingredient_nutrition_df.sum(0)
+    total_df["Ingredient"] = "-- Total"
+    ingredient_nutrition_df = ingredient_nutrition_df.append(total_df, ignore_index=True)
+    return generate_table(ingredient_nutrition_df.round(2))
 
 
 @app.callback(
     Output("ingredient-list", "children"),
-    Input("ingredient-list-store", "data"),
-    Input("food-names-store", "data"),
+    Input("food-data-store", "data"),
     prevent_initial_call=True
 )
-def render_ingredient_list(ingredient_list_data_json, food_names_store_data_json):
-    ingredient_ids_data = json.loads(ingredient_list_data_json or "[]")
-    food_names_store_data_d = {i_id: i_name for i_id, i_name, _ in json.loads(food_names_store_data_json or "[]")}
-    ingredient_list_data = [div_ingredient_list_entry(i_id, food_names_store_data_d[i_id]) for i_id in ingredient_ids_data]
+def render_ingredient_list(ingredient_nutrition_data_json):
+    ingredient_nutrition_data = json.loads(ingredient_nutrition_data_json or "[]")
+    ingredient_list_data = [div_ingredient_list_entry(i_id, i_data["ingredients"][0]["parsed"][0]["food"])
+                            for i_id, i_data in ingredient_nutrition_data]
     return ingredient_list_data
 
 
