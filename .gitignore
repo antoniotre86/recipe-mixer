@@ -2,3 +2,5 @@
 /config.yml
 /data/
 *.pyc
+.idea
+/.env

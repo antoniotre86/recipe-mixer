@@ -4,6 +4,7 @@ Created on 12/11/2021
 @author: trentaa
 '''
 import json
+import os
 
 import dash
 import dash_core_components as dcc
@@ -12,16 +13,17 @@ import pandas as pd
 from dash.dependencies import Input, Output, State
 
 from recipe_mixer.food_data import FoodData
-import yaml
+from dotenv import load_dotenv
 
 
 app = dash.Dash(__name__)
 
 
 # Initialise food data API client
-with open("./config.yml", "rb") as foo:
-    api_config = yaml.load(foo, Loader=yaml.FullLoader)
-fd = FoodData(**api_config)
+load_dotenv()
+api_key = os.getenv("API_KEY")
+app_id = os.getenv("APP_ID")
+fd = FoodData(api_key=api_key, app_id=app_id)
 
 measure_options = [{"label": m, "value": m} for m in fd.measure_uris.keys()]
 
